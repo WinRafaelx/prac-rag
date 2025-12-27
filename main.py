@@ -4,6 +4,12 @@ from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+import asyncio
+import sys
+
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 class RAGPipeline:
     def __init__(self):
         # 1. Connection Setup (psycopg3 compatible)
@@ -20,14 +26,18 @@ class RAGPipeline:
 
         # 3. Initialize High-Perf Engine & Store
         self.engine = PGEngine.from_connection_string(
-            connection_string=self.connection,
+            url=self.connection,
         )
+
+        # self.engine.init_vectorstore_table(
+        #     table_name=self.table_name,
+        #     vector_size=768,
+        # )
         
-        self.vector_store = PGVectorStore(
+        self.vector_store = PGVectorStore.create_sync(
             engine=self.engine,
             embedding_service=self.embeddings,
             table_name=self.table_name,
-            use_jsonb=True  # Best performance for metadata filtering
         )
 
         self.splitter = RecursiveCharacterTextSplitter(
@@ -62,6 +72,8 @@ Context:
 
 Question: {query}
 """
+
+        print(prompt)
         response = self.llm.invoke(prompt)
         return response.content
 
@@ -70,7 +82,7 @@ if __name__ == "__main__":
     rag = RAGPipeline()
     
     # Only need to ingest once
-    rag.ingest_pdf("Mawin.pdf")
+    # rag.ingest_pdf("Mawin.pdf")
     
-    answer = rag.ask("What is this file about?")
+    answer = rag.ask("List all of work places that this guy has worked at?")
     print(f"\n🤖 Qwen3 says: \n{answer}")
